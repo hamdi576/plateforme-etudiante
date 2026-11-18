@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plateforme étudiante </title>
+<style>
+  :root { --bg:#f2f4f7; --card:#fff; --ink:#172036; --muted:#5b6577; --line:#d9dee7; --brand:#0f6b62; --soft:#dff1ee; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#11161f; --card:#1a212d; --ink:#e8ecf3; --muted:#9aa5b8; --line:#2b3546; --brand:#4fd1bf; --soft:#173a37; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--ink); line-height:1.6; }
+  header { background:var(--card); border-bottom:1px solid var(--line); padding:10px 20px; display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; }
+  header h1 { font-size:19px; margin:0; }
+  .controls { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  select,input,button { font:inherit; color:var(--ink); }
+  select,input { background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:6px 10px; }
+  nav { display:flex; gap:4px; padding:10px 20px 0; max-width:960px; margin:0 auto; flex-wrap:wrap; }
+  nav button { background:none; border:none; padding:8px 16px; cursor:pointer; font-weight:600; color:var(--muted); border-bottom:3px solid transparent; }
+  nav button.on { color:var(--brand); border-color:var(--brand); }
+  main { max-width:960px; margin:0 auto; padding:16px 20px 60px; }
+  :focus-visible { outline:3px solid var(--brand); outline-offset:2px; }
+  .box { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:20px; }
+  .center { max-width:460px; margin:60px auto; text-align:center; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:12px; }
+  .subject { background:var(--card); border:1px solid var(--line); border-left:6px solid var(--c); border-radius:10px; padding:14px 16px; cursor:pointer; text-align:left; }
+  .subject b { display:block; font-size:17px; } .subject small,.meta { color:var(--muted); } .meta { font-size:13px; }
+  .back { background:none; border:none; color:var(--brand); cursor:pointer; font-weight:600; padding:0 0 10px; }
+  .tabs { display:flex; gap:8px; margin:10px 0 14px; }
+  .tabs button { border:1px solid var(--line); background:var(--card); border-radius:20px; padding:4px 16px; cursor:pointer; }
+  .tabs button.on { background:var(--brand); color:#fff; border-color:var(--brand); }
+  .file { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px 14px; margin-bottom:8px; display:flex; justify-content:space-between; gap:10px; align-items:center; flex-wrap:wrap; }
+  .file a { color:var(--ink); font-weight:600; text-decoration:none; } .file a:hover { color:var(--brand); text-decoration:underline; }
+  .badge { font-size:12px; border-radius:12px; padding:1px 10px; background:#fef3c7; color:#92400e; }
+  .btn { background:var(--brand); color:#fff; border:none; border-radius:8px; padding:7px 16px; cursor:pointer; font-weight:600; }
+  .btn.ghost { background:none; color:var(--brand); border:1px solid var(--brand); }
+  .btn.danger { background:none; color:#b91c1c; border:1px solid #b91c1c; padding:3px 10px; }
+  form.up { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:10px; margin-top:14px; }
+  form.up .full { grid-column:1/-1; } form.up h3 { grid-column:1/-1; margin:0; font-size:16px; }
+  table { width:100%; border-collapse:collapse; background:var(--card); }
+  th,td { border:1px solid var(--line); padding:8px 10px; text-align:left; vertical-align:top; }
+  th { background:var(--soft); color:var(--brand); } tr.today td { background:var(--soft); }
+  .slot { margin-bottom:4px; padding-left:8px; border-left:4px solid var(--c); }
+  .scroll { overflow-x:auto; }
+  .chat .msgs { min-height:200px; max-height:360px; overflow-y:auto; display:flex; flex-direction:column; gap:8px; margin:10px 0; }
+  .msg { padding:8px 12px; border-radius:12px; max-width:85%; white-space:pre-wrap; }
+  .msg.me { background:var(--brand); color:#fff; align-self:flex-end; } .msg.ai { background:var(--bg); border:1px solid var(--line); align-self:flex-start; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; } .row input { flex:1; min-width:160px; }
+  .empty { color:var(--muted); padding:20px; text-align:center; border:1px dashed var(--line); border-radius:10px; }
+  .or { color:var(--muted); margin:16px 0; font-size:13px; }
+  .err { color:#b91c1c; font-size:14px; min-height:20px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script>
+/* =====================================================
+   0) RÉGLAGES
+   ===================================================== */
+/* Pour activer le VRAI bouton Google : créez un « Client ID OAuth » dans Google Cloud Console
+   (type : application Web), ajoutez l'adresse de votre site dans « Origines JavaScript autorisées »,
+   puis collez-le ici. Le bouton ne fonctionne pas en ouvrant le fichier directement (file://) :
+   il faut un petit serveur local (ex. extension « Live Server » de VS Code) ou un hébergement. */
+const GOOGLE_CLIENT_ID = '';
+
+const DAYS = ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
+const TYPES = { cours:'Cours', td:'TD', tp:'TP' };
+const COLORS = ['#0f6b62','#b45309','#6d28d9','#be185d','#1d4ed8','#4d7c0f','#c2410c'];
+
+/* =====================================================
+   1) Stockage local (phase 1 : seulement sur CET appareil)
+   En phase 2, tout ceci sera remplacé par Supabase pour partager entre étudiants. */
+const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
+const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const $ = s => document.querySelector(s);
+
+/* =====================================================
+   2) État
+   ===================================================== */
+const state = {
+  user: load('sp_session', null),   // { email, name }
+  profiles: load('sp_profiles', {}),// profils par e-mail : { groupe, schedule:[...] }
+  files: load('sp_files', []),      // fichiers déposés
+  role: 'student',                  // démo seulement : en vrai, le rôle est attribué par l'admin
+  editing: false,                   // true = écran de configuration
+  draft: [], draftGroup: '',        // brouillon de l'emploi du temps
+  page: 'subjects', subjectKey: null, type: 'cours', chat: [], error: ''
+};
+const profile = () => state.user && state.profiles[state.user.email];
+
+/* Une matière = un nom + un enseignant, déduits de l'emploi du temps de l'étudiant */
+const keyOf = (name, teacher) => (name.trim() + '|' + teacher.trim()).toLowerCase();
+function mySubjects() {
+  const map = {};
+  (profile()?.schedule || []).forEach(s => {
+    const k = keyOf(s.subject, s.teacher);
+    if (!map[k]) map[k] = { key:k, name:s.subject, teacher:s.teacher, color:COLORS[Object.keys(map).length % COLORS.length] };
+  });
+  return Object.values(map);
+}
+
+/* =====================================================
+   3) Connexion Gmail
+   ===================================================== */
+function login(email, name, lastName = '', firstName = '') {
+  email = email.trim().toLowerCase();
+  if (!/^[^\s@]+@gmail\.com$/.test(email)) { state.error = 'Utilisez une adresse Gmail valide (@gmail.com).'; return render(); }
+  const fullName = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ') || name || email.split('@')[0];
+  state.user = { email, name: fullName, firstName: firstName.trim(), lastName: lastName.trim() };
+  save('sp_session', state.user);
+  state.error = '';
+  if (!profile()) startSetup();     // première connexion : on demande l'emploi du temps
+  render();
+}
+function logout() { state.user = null; save('sp_session', null); state.editing = false; render(); }
+
+/* Réponse du vrai bouton Google : on lit l'e-mail dans le jeton (JWT).
+   ATTENTION : lire le jeton ici ne le VÉRIFIE pas. La vraie vérification se fait côté serveur (phase 2, Supabase Auth). */
+function onGoogle(resp) {
+  const b = resp.credential.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
+  const p = JSON.parse(decodeURIComponent(atob(b).split('').map(c => '%' + c.charCodeAt(0).toString(16).padStart(2,'0')).join('')));
+  login(p.email, p.name, p.family_name || '', p.given_name || '');
+}
+function initGoogleButton() {
+  if (!GOOGLE_CLIENT_ID || !$('#gbtn')) return;
+  const go = () => { google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: onGoogle });
+                     google.accounts.id.renderButton($('#gbtn'), { theme:'outline', size:'large', text:'continue_with' }); };
+  if (window.google?.accounts) return go();
+  const s = document.createElement('script'); s.src = 'https://accounts.google.com/gsi/client'; s.onload = go; document.head.appendChild(s);
+}
+
+function viewLogin() {
+  return `<div class="box center">
+    <h1 style="margin-top:0">Plateforme étudiante</h1>
+    <p class="meta">Renseignez votre nom, prénom et compte Gmail pour accéder à vos cours et TD.</p>
+    ${GOOGLE_CLIENT_ID ? '<div id="gbtn" style="display:flex;justify-content:center"></div><div class="or">ou renseignez vos informations</div>'
+      : ''}
+    <form id="loginForm" style="display:flex;flex-direction:column;gap:10px;text-align:left;margin-top:12px">
+      <div class="row">
+        <input name="lastName" type="text" placeholder="Nom" required autocomplete="family-name">
+        <input name="firstName" type="text" placeholder="Prénom" required autocomplete="given-name">
+      </div>
+      <input name="email" type="email" placeholder="votre.nom@gmail.com" required autocomplete="email">
+      <button class="btn" type="submit" style="width:100%;margin-top:4px">Continuer</button>
+    </form>
+    <div class="err" style="margin-top:8px">${esc(state.error)}</div>
+  </div>`;
+}
+
+/* =====================================================
+   4) Configuration de l'emploi du temps (1re connexion)
+   ===================================================== */
+function startSetup() {
+  const p = profile();
+  state.draft = p ? JSON.parse(JSON.stringify(p.schedule)) : [];
+  state.draftGroup = p ? p.groupe : '';
+  state.editing = true; state.error = '';
+}
+
+function viewSetup() {
+  const opt = arr => arr.map((v,i) => `<option value="${i}">${v}</option>`).join('');
+  return `<main><div class="box">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <h2 style="margin:0">Bienvenue ${esc(state.user.name)} 👋</h2>
+      <button class="btn ghost" data-logout="1" style="font-size:13px;padding:4px 12px">Changer de compte</button>
+    </div>
+    <p>Renseignez vos informations personnelles et votre emploi du temps. Le site en déduit <b>vos matières</b> et <b>vos enseignants</b>.</p>
+    <div class="row" style="margin-bottom:14px">
+      <input id="setupLast" value="${esc(state.user.lastName || '')}" placeholder="Nom" required>
+      <input id="setupFirst" value="${esc(state.user.firstName || '')}" placeholder="Prénom" required>
+      <input id="setupEmail" type="email" value="${esc(state.user.email || '')}" placeholder="votre.nom@gmail.com" required>
+    </div>
+    <label>Votre groupe <input id="grp" value="${esc(state.draftGroup)}" placeholder="ex. G1" style="width:140px"></label>
+
+    <form class="up" id="slotForm">
+      <h3>Ajouter une séance</h3>
+      <input name="subject" placeholder="Matière (ex. Algorithmique)" required>
+      <input name="teacher" placeholder="Enseignant (ex. Dr Ahmed)" required>
+      <select name="kind">${Object.entries(TYPES).map(([k,v]) => `<option value="${k}">${v}</option>`).join('')}</select>
+      <select name="day">${opt(DAYS)}</select>
+      <label>De <input name="from" type="time" value="08:30" required></label>
+      <label>À <input name="to" type="time" value="10:00" required></label>
+      <input name="room" placeholder="Salle (ex. Amphi A)">
+      <button class="btn" type="submit">+ Ajouter</button>
+    </form>
+
+    <h3>Ma semaine (${state.draft.length} séance${state.draft.length > 1 ? 's' : ''})</h3>
+    ${state.draft.length ? `<div class="scroll"><table>
+      <tr><th>Jour</th><th>Heure</th><th>Matière</th><th>Enseignant</th><th>Type</th><th>Salle</th><th></th></tr>
+      ${state.draft.map((s,i) => `<tr><td>${DAYS[s.day]}</td><td>${s.from}–${s.to}</td><td>${esc(s.subject)}</td>
+        <td>${esc(s.teacher)}</td><td>${TYPES[s.kind]}</td><td>${esc(s.room)}</td>
+        <td><button class="btn danger" data-del="${i}" aria-label="Supprimer">✕</button></td></tr>`).join('')}
+    </table></div>` : '<div class="empty">Aucune séance ajoutée pour le moment.</div>'}
+    <div class="err">${esc(state.error)}</div>
+    <div class="row" style="margin-top:8px">
+      <button class="btn" data-finish="1">Terminer</button>
+      ${profile() ? '<button class="btn ghost" data-cancel="1">Annuler</button>' : ''}
+    </div>
+  </div></main>`;
+}
+
+/* =====================================================
+   5) Application principale
+   ===================================================== */
+function viewApp() {
+  const pages = { subjects: pgSubjects, schedule: pgSchedule, review: pgReview, assistant: pgAssistant };
+  return `<header>
+      <h1>Plateforme étudiante <span class="meta">· ${esc(profile().groupe)}</span></h1>
+      <div class="controls">
+        <span class="meta"><b>${esc(state.user.name)}</b> (${esc(state.user.email)})</span>
+        <label class="meta">Rôle (démo) <select id="roleSel">
+          <option value="student" ${state.role==='student'?'selected':''}>Étudiant</option>
+          <option value="teacher" ${state.role==='teacher'?'selected':''}>Enseignant</option></select></label>
+        <button class="btn ghost" data-setup="1">Mon emploi du temps</button>
+        <button class="btn ghost" data-logout="1">Déconnexion</button>
+      </div></header>
+    <nav>${[['subjects','Matières'],['schedule','Emploi du temps'],['review','Validation'],['assistant','Assistant IA']]
+      .map(([k,v]) => `<button data-page="${k}" class="${state.page===k?'on':''}">${v}</button>`).join('')}</nav>
+    <main>${pages[state.page]()}</main>`;
+}
+
+function pgSubjects() {
+  const subs = mySubjects();
+  if (!state.subjectKey) return subs.length
+    ? `<div class="grid">${subs.map(s => `<button class="subject" style="--c:${s.color}" data-open="${esc(s.key)}">
+         <b>${esc(s.name)}</b><small>${esc(s.teacher)}</small></button>`).join('')}</div>`
+    : '<div class="empty">Aucune matière. Ajoutez votre emploi du temps.</div>';
+
+  const sub = subs.find(s => s.key === state.subjectKey);
+  if (!sub) { state.subjectKey = null; return pgSubjects(); }
+  const files = state.files.filter(f => f.key === sub.key && f.type === state.type && f.status === 'published')
+                           .sort((a,b) => b.date.localeCompare(a.date));
+  return `<button class="back" data-back="1">← Toutes les matières</button>
+    <h2 style="margin:0">${esc(sub.name)} <small class="meta">${esc(sub.teacher)}</small></h2>
+    <div class="tabs">${Object.entries(TYPES).map(([k,v]) => `<button data-type="${k}" class="${k===state.type?'on':''}">${v}</button>`).join('')}</div>
+    ${files.length ? files.map(f => `<div class="file"><div>
+        <a href="${esc(f.url)}" target="_blank" rel="noopener">📄 ${esc(f.title)}</a>
+        <div class="meta">${esc(f.date)} · Déposé par : ${esc(f.by)}</div></div>
+        <button class="btn ghost" data-ask="${f.id}">Demander à l'assistant</button></div>`).join('')
+      : `<div class="empty">Aucun fichier ${TYPES[state.type]} pour l'instant.</div>`}
+    <div class="box" style="margin-top:16px"><form class="up" id="upForm">
+      <h3>Déposer un fichier <small class="meta">${state.role==='teacher' ? 'Publié immédiatement.' : 'Visible après validation.'}</small></h3>
+      <input name="title" placeholder="Titre du fichier" required>
+      <select name="type">${Object.entries(TYPES).map(([k,v]) => `<option value="${k}" ${k===state.type?'selected':''}>${v}</option>`).join('')}</select>
+      <input name="date" type="date" required value="${new Date().toISOString().slice(0,10)}">
+      <input class="full" name="url" type="url" placeholder="Lien du fichier (Drive ou autre)" required>
+      <button class="btn full" type="submit">Déposer</button></form></div>`;
+}
+
+function pgSchedule() {
+  const subs = mySubjects(), slots = profile().schedule;
+  const today = (new Date().getDay() + 6) % 7;
+  return `<div class="scroll"><table><tr><th style="width:120px">Jour</th><th>Séances</th></tr>
+    ${DAYS.map((d,i) => { const list = slots.filter(s => s.day === i).sort((a,b) => a.from.localeCompare(b.from));
+      return `<tr class="${i===today?'today':''}"><th>${d}</th><td>${list.length ? list.map(s => {
+        const c = subs.find(x => x.key === keyOf(s.subject, s.teacher)).color;
+        return `<div class="slot" style="--c:${c}"><b>${esc(s.subject)}</b> (${TYPES[s.kind]}) – ${esc(s.teacher)}
+          <span class="meta">${s.from}–${s.to}${s.room ? ' · ' + esc(s.room) : ''}</span></div>`; }).join('') : '<span class="meta">—</span>'}</td></tr>`; }).join('')}
+  </table></div>`;
+}
+
+function pgReview() {
+  if (state.role !== 'teacher') return `<div class="empty">Page réservée aux enseignants et délégués. Choisissez « Enseignant » en haut pour l'essayer.</div>`;
+  const keys = mySubjects().map(s => s.key);
+  const pend = state.files.filter(f => f.status === 'pending' && keys.includes(f.key));
+  return pend.length ? pend.map(f => `<div class="file"><div><b>${esc(f.title)}</b>
+      <div class="meta">${TYPES[f.type]} · ${esc(f.by)} <span class="badge">En attente</span></div></div>
+      <div class="row"><button class="btn" data-ok="${f.id}">Accepter</button>
+      <button class="btn ghost" data-no="${f.id}">Refuser</button></div></div>`).join('')
+    : '<div class="empty">Aucun fichier en attente.</div>';
+}
+
+function pgAssistant() {
+  return `<div class="box chat"><div class="row">
+      ${['Résume','Explique-moi',"Interroge-moi sur"].map((m,i) => `<button class="btn ghost" data-mode="${m}">${['Résumer','Expliquer',"M'interroger"][i]}</button>`).join('')}</div>
+    <div class="msgs" id="msgs">${state.chat.length ? state.chat.map(m => `<div class="msg ${m.who}">${esc(m.text)}</div>`).join('')
+      : '<div class="meta">Choisissez un cours dans une matière, puis posez votre question.</div>'}</div>
+    <form class="row" id="chatForm"><input id="q" placeholder="Posez votre question..." autocomplete="off">
+      <button class="btn" type="submit">Envoyer</button></form></div>`;
+}
+
+/* Fonction factice. En phase 3 : appel à une fonction serveur qui garde la clé d'API. JAMAIS la clé ici. */
+async function askAI(q) { return "Réponse de test. En phase 3, l'assistant répondra à partir du texte du cours.\nQuestion : " + q; }
+async function sendQuestion(q) {
+  if (!q.trim()) return;
+  state.chat.push({ who:'me', text:q }); render();
+  state.chat.push({ who:'ai', text: await askAI(q) }); render();
+}
+
+/* =====================================================
+   6) Affichage et événements
+   ===================================================== */
+function render() {
+  $('#root').innerHTML = !state.user ? viewLogin() : state.editing ? viewSetup() : viewApp();
+  if (!state.user) initGoogleButton();
+  const m = $('#msgs'); if (m) m.scrollTop = m.scrollHeight;
+}
+
+document.addEventListener('click', e => {
+  const t = e.target.closest('button'); if (!t) return;
+  const d = t.dataset;
+  if (d.logout) return logout();
+  if (d.setup) { startSetup(); return render(); }
+  if (d.cancel) { state.editing = false; return render(); }
+  if (d.del) state.draft.splice(+d.del, 1);
+  else if (d.finish) {
+    const lastName = ($('#setupLast')?.value || '').trim();
+    const firstName = ($('#setupFirst')?.value || '').trim();
+    const email = ($('#setupEmail')?.value || '').trim().toLowerCase();
+    state.draftGroup = ($('#grp').value || '').trim();
+    if (!lastName || !firstName) state.error = 'Indiquez votre nom et votre prénom.';
+    else if (!/^[^\s@]+@gmail\.com$/.test(email)) state.error = 'Utilisez une adresse Gmail valide (@gmail.com).';
+    else if (!state.draftGroup) state.error = 'Indiquez votre groupe.';
+    else if (!state.draft.length) state.error = 'Ajoutez au moins une séance.';
+    else {
+      const oldEmail = state.user.email;
+      const fullName = [firstName, lastName].filter(Boolean).join(' ');
+      state.user = { email, name: fullName, firstName, lastName };
+      save('sp_session', state.user);
+      if (oldEmail && oldEmail !== email) delete state.profiles[oldEmail];
+      state.profiles[email] = { groupe: state.draftGroup, schedule: state.draft };
+      save('sp_profiles', state.profiles);
+      state.editing = false; state.error = ''; state.page = 'subjects'; state.subjectKey = null;
+    }
+  }
+  else if (d.page) { state.page = d.page; if (d.page === 'subjects') state.subjectKey = null; }
+  else if (d.open) state.subjectKey = d.open;
+  else if (d.back) state.subjectKey = null;
+  else if (d.type) state.type = d.type;
+  else if (d.ok || d.no) { const f = state.files.find(x => x.id === +(d.ok || d.no)); f.status = d.ok ? 'published' : 'rejected'; save('sp_files', state.files); }
+  else if (d.ask) { const f = state.files.find(x => x.id === +d.ask); state.page = 'assistant'; state.chat = [{ who:'ai', text:'Cours sélectionné : ' + f.title }]; }
+  else if (d.mode) return sendQuestion(d.mode + ' ce cours');
+  else return;
+  if (d.del || d.finish) {
+    state.draftGroup = $('#grp') ? $('#grp').value : state.draftGroup;
+    if ($('#setupLast')) state.user.lastName = $('#setupLast').value;
+    if ($('#setupFirst')) state.user.firstName = $('#setupFirst').value;
+    if ($('#setupEmail')) state.user.email = $('#setupEmail').value;
+  }
+  render();
+});
+
+document.addEventListener('submit', e => {
+  e.preventDefault();
+  const id = e.target.id, f = new FormData(e.target);
+  if (id === 'loginForm') login(f.get('email'), '', f.get('lastName') || '', f.get('firstName') || '');
+  else if (id === 'slotForm') {
+    if ($('#setupLast')) state.user.lastName = $('#setupLast').value;
+    if ($('#setupFirst')) state.user.firstName = $('#setupFirst').value;
+    if ($('#setupEmail')) state.user.email = $('#setupEmail').value;
+    if (f.get('from') >= f.get('to')) { state.error = "L'heure de fin doit être après l'heure de début."; state.draftGroup = $('#grp').value; return render(); }
+    state.draftGroup = $('#grp').value; state.error = '';
+    state.draft.push({ subject:f.get('subject').trim(), teacher:f.get('teacher').trim(), kind:f.get('kind'),
+                       day:+f.get('day'), from:f.get('from'), to:f.get('to'), room:f.get('room').trim() });
+    render();
+  }
+  else if (id === 'upForm') {
+    state.files.push({ id:Date.now(), key:state.subjectKey, type:f.get('type'), title:f.get('title'), url:f.get('url'),
+      date:f.get('date'), status: state.role==='teacher' ? 'published' : 'pending', by: state.role==='teacher' ? 'Enseignant' : state.user.name });
+    save('sp_files', state.files); state.type = f.get('type');
+    alert(state.role==='teacher' ? 'Fichier publié.' : 'Fichier déposé, en attente de validation.'); render();
+  }
+  else if (id === 'chatForm') sendQuestion($('#q').value);
+});
+
+document.addEventListener('change', e => { if (e.target.id === 'roleSel') { state.role = e.target.value; render(); } });
+
+if (state.user && !profile()) startSetup();   // session existante mais profil manquant
+render();
+</script>
+</body>
+</html>
